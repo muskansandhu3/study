@@ -1,0 +1,58 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs / runtime
+*.log
+*.pid
+*.tmp
+
+# Archives / local exports
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local tool state
+.python-version
