@@ -10,14 +10,17 @@ from multimodal_moderation.types.model_choice import ModelChoice
 load_dotenv()
 
 
-def _get_required_env(key: str) -> str:
-    value = os.environ.get(key)
-    if not value:
-        raise ValueError(f"{key} environment variable is required but not set")
-    return value
+def _get_required_env(*keys: str) -> str:
+    for key in keys:
+        value = os.environ.get(key)
+        if value:
+            return value
+
+    joined_keys = " or ".join(keys)
+    raise ValueError(f"{joined_keys} environment variable is required but not set")
 
 
-GEMINI_API_KEY: str = _get_required_env("GEMINI_API_KEY")
+GEMINI_API_KEY: str = _get_required_env("GEMINI_API_KEY", "GOOGLE_API_KEY")
 USER_API_KEY: str = _get_required_env("USER_API_KEY")
 DEFAULT_GOOGLE_MODEL: str = _get_required_env("DEFAULT_GOOGLE_MODEL")
 
