@@ -1,118 +1,104 @@
-"""
-Evaluation test cases for video moderation.
-"""
-import asyncio
-from pydantic import BaseModel
-from typing import List
-from agents.video_agent import moderate_video
+import sys
+from pathlib import Path
+from typing import List, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from pydantic import BaseModel, Field
+from pydantic_evals import Case, Dataset
+from pydantic_evals.evaluators import IsInstance, LLMJudge
+import tenacity
+from pydantic_ai.retries import RetryConfig
+
+from multimodal_moderation.agents.video_agent import moderate_video
+from multimodal_moderation.types.model_choice import ModelChoice
+from multimodal_moderation.types.moderation_result import VideoModerationResult
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from common_evaluators import HasRationale
+from config import get_model_under_test, get_judge_model
+from utils import create_repeated_cases, get_test_data_path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from evaluators import VideoModerationCheck
+
+judge_model, judge_settings = get_judge_model()
 
 
-class VideoTestCase(BaseModel):
-    """Test case for video moderation evaluation."""
-    filename: str
-    expected_contains_pii: bool
-    expected_is_unfriendly: bool
-    expected_is_unprofessional: bool
-    description: str
+class VideoInput(BaseModel):
+    video_file: str = Field(description="Path to video file to moderate")
 
 
-# Define test cases
-TEST_CASES: List[VideoTestCase] = [
-    VideoTestCase(
-        filename="product_demo.mp4",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Product demonstration video"
+async def run_video_moderation(inputs: List[VideoInput]) -> VideoModerationResult:
+    assert len(inputs) == 1
+    video_bytes = Path(inputs[0].video_file).read_bytes()
+    model_choice = get_model_under_test()
+    return await moderate_video(model_choice, video_bytes, media_type="video/mp4")
+
+
+cases: List[Case[List[VideoInput], VideoModerationResult, Any]] = [
+    Case(
+        name="professional_video",
+        inputs=[VideoInput(video_file=get_test_data_path("professional_video.mp4"))],
+        metadata={"category": "video_moderation"},
+        evaluators=(
+            VideoModerationCheck(
+                expected_pii=False,
+                expected_disturbing=False,
+                expected_low_quality=False,
+            ),
+            LLMJudge(
+                model=judge_model,
+                rubric="The rationale should confirm the video is professional with no faces, disturbing content, or quality issues",
+                include_input=True,
+            ),
+        ),
     ),
-    VideoTestCase(
-        filename="tutorial.mp4",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Tutorial video"
+    Case(
+        name="video_with_face",
+        inputs=[VideoInput(video_file=get_test_data_path("video_with_face.mp4"))],
+        metadata={"category": "video_moderation"},
+        evaluators=(
+            VideoModerationCheck(
+                expected_pii=True,
+                expected_disturbing=False,
+                expected_low_quality=False,
+            ),
+            LLMJudge(
+                model=judge_model,
+                rubric="The rationale should specifically mention the presence of a person's face or identifying features",
+                include_input=True,
+            ),
+        ),
     ),
 ]
 
 
-def create_test_video() -> bytes:
-    """Create a minimal test video file."""
-    # Minimal MP4 container
-    return bytes([
-        0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
-        0x69, 0x73, 0x6F, 0x6D, 0x00, 0x00, 0x02, 0x00
-    ] * 8)
+video_dataset = Dataset[List[VideoInput], VideoModerationResult, Any](
+    cases=create_repeated_cases(cases),
+    evaluators=[
+        IsInstance(type_name="VideoModerationResult"),
+        HasRationale(),
+    ],
+)
 
 
-async def evaluate_case(test_case: VideoTestCase) -> dict:
-    """Evaluate a single test case."""
-    video_bytes = create_test_video()
-    result = await moderate_video(video_bytes)
-    
-    pii_correct = result.contains_pii == test_case.expected_contains_pii
-    unfriendly_correct = result.is_unfriendly == test_case.expected_is_unfriendly
-    unprofessional_correct = result.is_unprofessional == test_case.expected_is_unprofessional
-    
-    all_correct = pii_correct and unfriendly_correct and unprofessional_correct
-    
-    return {
-        "description": test_case.description,
-        "filename": test_case.filename,
-        "expected": {
-            "pii": test_case.expected_contains_pii,
-            "unfriendly": test_case.expected_is_unfriendly,
-            "unprofessional": test_case.expected_is_unprofessional
-        },
-        "actual": {
-            "pii": result.contains_pii,
-            "unfriendly": result.is_unfriendly,
-            "unprofessional": result.is_unprofessional
-        },
-        "correct": {
-            "pii": pii_correct,
-            "unfriendly": unfriendly_correct,
-            "unprofessional": unprofessional_correct
-        },
-        "all_correct": all_correct,
-        "rationale": result.rationale
-    }
+async def main():
+    retry_config = RetryConfig(
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_full_jitter(multiplier=0.5, max=15),
+    )
 
+    report = await video_dataset.evaluate(
+        run_video_moderation,
+        retry_task=retry_config,
+        retry_evaluators=retry_config,
+    )
 
-async def run_evals():
-    """Run all evaluation cases."""
-    print("=" * 80)
-    print("VIDEO MODERATION EVALUATION")
-    print("=" * 80)
-    print()
-    
-    results = []
-    for test_case in TEST_CASES:
-        result = await evaluate_case(test_case)
-        results.append(result)
-    
-    correct_count = 0
-    total_count = len(results)
-    
-    for i, result in enumerate(results, 1):
-        status = "PASS" if result["all_correct"] else "FAIL"
-        print(f"{i}. {status} - {result['description']}")
-        print(f"   File: {result['filename']}")
-        print(f"   Expected: PII={result['expected']['pii']}, "
-              f"Unfriendly={result['expected']['unfriendly']}, "
-              f"Unprofessional={result['expected']['unprofessional']}")
-        print(f"   Actual:   PII={result['actual']['pii']}, "
-              f"Unfriendly={result['actual']['unfriendly']}, "
-              f"Unprofessional={result['actual']['unprofessional']}")
-        print()
-        
-        if result["all_correct"]:
-            correct_count += 1
-    
-    accuracy = (correct_count / total_count) * 100
-    print("=" * 80)
-    print(f"SUMMARY: {correct_count}/{total_count} test cases passed ({accuracy:.1f}% accuracy)")
-    print("=" * 80)
+    report.print(include_input=True, include_output=True, include_durations=False)
 
 
 if __name__ == "__main__":
-    asyncio.run(run_evals())
+    import asyncio
+
+    asyncio.run(main())

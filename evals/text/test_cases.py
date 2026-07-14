@@ -1,220 +1,189 @@
 """
-Evaluation test cases for text moderation.
+Text Moderation Evaluation Suite
+
+This module defines test cases and runs evaluations for the text moderation agent.
+
+EVALUATION FLOW:
+1. Load test cases from test_data/ directory
+2. For each test case, run the moderation agent (model under test)
+3. Use evaluators to check if the output is correct:
+   - TextModerationCheck: Verifies flags are set correctly
+   - LLMJudge: Evaluates if the rationale makes sense
+4. Generate a report showing pass/fail for each test case
+
+RUNNING EVALS:
+    python evals/text/test_cases.py
 """
-import asyncio
-from pydantic import BaseModel
-from typing import List
-from agents.text_agent import moderate_text
-from moderation_types import ModerationResult
+
+import sys
+from pathlib import Path
+from typing import List, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from pydantic import BaseModel, Field
+from pydantic_evals import Case, Dataset
+from pydantic_evals.evaluators import IsInstance, LLMJudge
+import tenacity
+from pydantic_ai.retries import RetryConfig
+
+from multimodal_moderation.agents.text_agent import moderate_text
+from multimodal_moderation.types.moderation_result import TextModerationResult
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from common_evaluators import HasRationale
+from config import get_model_under_test, get_judge_model
+from utils import create_repeated_cases, get_test_data_path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from evaluators import TextModerationCheck
+
+# Get the models for evaluation
+judge_model, judge_settings = get_judge_model()
 
 
-class TextTestCase(BaseModel):
-    """Test case for text moderation evaluation."""
-    text: str
-    expected_contains_pii: bool
-    expected_is_unfriendly: bool
-    expected_is_unprofessional: bool
-    description: str
+class TextInput(BaseModel):
+    """Input schema for text moderation test cases."""
+
+    text_file: str = Field(description="Path to text file to moderate")
 
 
-# Define test cases
-TEST_CASES: List[TextTestCase] = [
-    # Clean, professional messages
-    TextTestCase(
-        text="Hello, I would like to inquire about your product offerings.",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Clean professional inquiry"
+async def run_text_moderation(inputs: List[TextInput]) -> TextModerationResult:
+    """
+    Run the text moderation agent on a test input.
+
+    This is the function being evaluated. It loads text from a file and
+    runs it through the moderation agent (using the model under test).
+
+    Args:
+        inputs: List with one TextInput containing path to test file
+
+    Returns:
+        TextModerationResult from the moderation agent
+    """
+    assert len(inputs) == 1, "Text moderation expects exactly one input"
+    text = Path(inputs[0].text_file).read_text()
+    # Use the model under test (not the judge model!)
+    model_choice = get_model_under_test()
+    return await moderate_text(model_choice, text)
+
+
+# Test Cases
+# Each case defines:
+# - name: Identifier for this test
+# - inputs: The test data (path to file)
+# - evaluators: How to check if the output is correct
+#   - TextModerationCheck: Checks boolean flags match expected values
+#   - LLMJudge: Uses an LLM to evaluate if the rationale is good
+cases: List[Case[List[TextInput], TextModerationResult, Any]] = [
+    # TODO: fill in the missing
+    Case(
+        name="professional_text",
+        # Read the text from a file for repeatibility (we could have also inlined it here)
+        inputs=[TextInput(text_file=get_test_data_path("professional_text.txt"))],
+        metadata={"category": "text_moderation"},
+
+        # TODO: fill the parameters for the evaluators for this case. We need:
+        # 1. A TextModerationCheck that expects expected_pii=False, expected_unfriendly=False, expected_unprofessional=False
+        # 2. An LLMJudge that uses the judge_model and has a rubric that checks that the rationale explains why the text is 
+        #    professional and friendly, with no flags raised. Example: 
+        #    "The rationale should explain why the text is professional and friendly."
+        evaluators=(
+            # Check that no safety flags are raised for professional text
+            TextModerationCheck(
+                expected_pii=...,  # TODO
+                expected_unfriendly=...,  # TODO
+                expected_unprofessional=...,  # TODO
+            ),
+            # Use judge model to evaluate if the rationale makes sense
+            LLMJudge(
+                model=...,  # TODO: add the model to be used as judge (judge_model)
+                rubric=...,  # TODO: add a rubric that checks the rationale explains why the text is professional and friendly.
+                include_input=..., # TODO: in this case it is probably useful to include the input text for context, so set this to True
+            ),
+        ),
     ),
-    TextTestCase(
-        text="Thank you for your assistance. I appreciate your help.",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Polite thank you message"
+    Case(
+        name="text_with_pii",
+        inputs=[TextInput(text_file=get_test_data_path("text_with_pii.txt"))],
+        metadata={"category": "text_moderation"},
+        evaluators=(
+            TextModerationCheck(
+                expected_pii=True,
+                expected_unfriendly=False,
+                expected_unprofessional=False,
+            ),
+            LLMJudge(
+                model=judge_model,
+                rubric="The rationale should identify specific PII items (name, address, email, phone number, account number)",
+                include_input=True,
+            ),
+        ),
     ),
-    TextTestCase(
-        text="Could you please provide more information about the warranty?",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Professional question"
-    ),
-    
-    # PII cases
-    TextTestCase(
-        text="My email is john.doe@example.com and you can reach me there.",
-        expected_contains_pii=True,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Contains email address"
-    ),
-    TextTestCase(
-        text="Please call me at 555-123-4567 to discuss further.",
-        expected_contains_pii=True,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Contains phone number"
-    ),
-    TextTestCase(
-        text="My SSN is 123-45-6789 for verification.",
-        expected_contains_pii=True,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Contains Social Security Number"
-    ),
-    TextTestCase(
-        text="I live at 123 Main Street, New York, NY 10001.",
-        expected_contains_pii=True,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Contains physical address"
-    ),
-    
-    # Unfriendly cases
-    TextTestCase(
-        text="You are completely useless and this service is terrible!",
-        expected_contains_pii=False,
-        expected_is_unfriendly=True,
-        expected_is_unprofessional=True,
-        description="Hostile and insulting"
-    ),
-    TextTestCase(
-        text="This is the worst experience I've ever had. You people are incompetent!",
-        expected_contains_pii=False,
-        expected_is_unfriendly=True,
-        expected_is_unprofessional=True,
-        description="Aggressive complaint"
-    ),
-    TextTestCase(
-        text="I hate dealing with you idiots.",
-        expected_contains_pii=False,
-        expected_is_unfriendly=True,
-        expected_is_unprofessional=True,
-        description="Rude and insulting"
-    ),
-    
-    # Unprofessional cases
-    TextTestCase(
-        text="I absolutely cannot offer you a damn refund for this crap.",
-        expected_contains_pii=False,
-        expected_is_unfriendly=True,
-        expected_is_unprofessional=True,
-        description="Profanity in refusal"
-    ),
-    TextTestCase(
-        text="Whatever, just forget it. I don't care anymore.",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=True,
-        description="Dismissive and unprofessional"
-    ),
-    
-    # Edge cases
-    TextTestCase(
-        text="I'm frustrated with this situation, but I understand you're trying to help.",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Expressing frustration professionally"
-    ),
-    TextTestCase(
-        text="This product isn't working as expected. Can we find a solution?",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Complaint but professional"
+    Case(
+        name="unfriendly_text",
+        inputs=[TextInput(text_file=get_test_data_path("unfriendly_text.txt"))],
+        metadata={"category": "text_moderation"},
+        evaluators=(
+            TextModerationCheck(
+                expected_pii=False,
+                expected_unfriendly=True,
+                expected_unprofessional=True,
+            ),
+            LLMJudge(
+                model=judge_model,
+                rubric="The rationale should explain why the tone is unfriendly and unprofessional, citing specific problematic phrases",
+                include_input=True,
+            ),
+        ),
     ),
 ]
 
 
-async def evaluate_case(test_case: TextTestCase) -> dict:
-    """Evaluate a single test case."""
-    result = await moderate_text(test_case.text)
-    
-    # Check if predictions match expectations
-    pii_correct = result.contains_pii == test_case.expected_contains_pii
-    unfriendly_correct = result.is_unfriendly == test_case.expected_is_unfriendly
-    unprofessional_correct = result.is_unprofessional == test_case.expected_is_unprofessional
-    
-    all_correct = pii_correct and unfriendly_correct and unprofessional_correct
-    
-    return {
-        "description": test_case.description,
-        "text": test_case.text[:60] + "..." if len(test_case.text) > 60 else test_case.text,
-        "expected": {
-            "pii": test_case.expected_contains_pii,
-            "unfriendly": test_case.expected_is_unfriendly,
-            "unprofessional": test_case.expected_is_unprofessional
-        },
-        "actual": {
-            "pii": result.contains_pii,
-            "unfriendly": result.is_unfriendly,
-            "unprofessional": result.is_unprofessional
-        },
-        "correct": {
-            "pii": pii_correct,
-            "unfriendly": unfriendly_correct,
-            "unprofessional": unprofessional_correct
-        },
-        "all_correct": all_correct,
-        "rationale": result.rationale
-    }
+# Create the dataset with all test cases
+# create_repeated_cases() repeats each case EVAL_NUM_REPEATS times to measure consistency
+text_dataset = Dataset[List[TextInput], TextModerationResult, Any](\
+
+    # TODO: use the create_repeated_cases function to create the dataset with the test cases defined above
+    # repeated EVAL_NUM_REPEATS times (as defined in .env). This helps measure consistency of the model under test
+    # and reduces the variance of the measurements.
+    # HINT: you need to pass cases as the argument to create_repeated_cases
+    cases=...,
+    evaluators=[
+        # Global evaluators that apply to all test cases
+        IsInstance(type_name="TextModerationResult"),  # Check correct return type
+        HasRationale(),  # Check that rationale is not empty
+    ],
+)
 
 
-async def run_evals():
-    """Run all evaluation cases."""
-    print("=" * 80)
-    print("TEXT MODERATION EVALUATION")
-    print("=" * 80)
-    print()
-    
-    results = []
-    for test_case in TEST_CASES:
-        result = await evaluate_case(test_case)
-        results.append(result)
-    
+async def main():
+    """
+    Run the evaluation suite.
+
+    This will:
+    1. Run each test case through the moderation agent
+    2. Evaluate outputs with both rule-based and LLM judges
+    3. Print a report showing which tests passed/failed
+    """
+    # Retry configuration for API calls (LLMs can be flaky)
+    retry_config = RetryConfig(
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_full_jitter(multiplier=0.5, max=15),
+    )
+
+    # Run all evaluations
+
+    # TODO: call await text_dataset.evaluate() with the appropriate parameters to enable retries
+    # HINT: you need to pass run_text_moderation as the function to test,
+    # and both retry_task and retry_evaluators should be set to retry_config
+    report = ...  # TODO
+
     # Print results
-    correct_count = 0
-    total_count = len(results)
-    
-    for i, result in enumerate(results, 1):
-        status = "PASS" if result["all_correct"] else "FAIL"
-        print(f"{i}. {status} - {result['description']}")
-        print(f"   Text: {result['text']}")
-        print(f"   Expected: PII={result['expected']['pii']}, "
-              f"Unfriendly={result['expected']['unfriendly']}, "
-              f"Unprofessional={result['expected']['unprofessional']}")
-        print(f"   Actual:   PII={result['actual']['pii']}, "
-              f"Unfriendly={result['actual']['unfriendly']}, "
-              f"Unprofessional={result['actual']['unprofessional']}")
-        
-        if not result["all_correct"]:
-            print(f"   Mismatches: ", end="")
-            mismatches = []
-            if not result["correct"]["pii"]:
-                mismatches.append("PII")
-            if not result["correct"]["unfriendly"]:
-                mismatches.append("Unfriendly")
-            if not result["correct"]["unprofessional"]:
-                mismatches.append("Unprofessional")
-            print(", ".join(mismatches))
-        
-        print()
-        
-        if result["all_correct"]:
-            correct_count += 1
-    
-    # Summary
-    accuracy = (correct_count / total_count) * 100
-    print("=" * 80)
-    print(f"SUMMARY: {correct_count}/{total_count} test cases passed ({accuracy:.1f}% accuracy)")
-    print("=" * 80)
-    print()
-    print("Note: The text agent may not always achieve 100% accuracy.")
-    print("This is expected behavior as LLM-based moderation has inherent variability.")
+    report.print(include_input=True, include_output=True, include_durations=False)
 
 
 if __name__ == "__main__":
-    asyncio.run(run_evals())
+    import asyncio
+
+    asyncio.run(main())

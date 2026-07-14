@@ -1,161 +1,129 @@
-"""
-Evaluation test cases for image moderation.
-"""
-import asyncio
-from pydantic import BaseModel
-from typing import List
-from agents.image_agent import moderate_image
+import sys
+from pathlib import Path
+from typing import List, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from pydantic import BaseModel, Field
+from pydantic_evals import Case, Dataset
+from pydantic_evals.evaluators import IsInstance, LLMJudge
+import tenacity
+from pydantic_ai.retries import RetryConfig
+
+from multimodal_moderation.agents.image_agent import moderate_image
+from multimodal_moderation.types.moderation_result import ImageModerationResult
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from common_evaluators import HasRationale
+from config import get_model_under_test, get_judge_model
+from utils import create_repeated_cases, get_test_data_path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from evaluators import ImageModerationCheck
+
+# Get the models for evaluation
+judge_model, judge_settings = get_judge_model()
 
 
-class ImageTestCase(BaseModel):
-    """Test case for image moderation evaluation."""
-    filename: str
-    expected_contains_pii: bool
-    expected_is_unfriendly: bool
-    expected_is_unprofessional: bool
-    description: str
+class ImageInput(BaseModel):
+    """Input schema for image moderation test cases."""
+    image_file: str = Field(description="Path to image file to moderate")
 
 
-# Define test cases
-TEST_CASES: List[ImageTestCase] = [
-    ImageTestCase(
-        filename="professional_image.jpg",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Professional business image"
+async def run_image_moderation(inputs: List[ImageInput]) -> ImageModerationResult:
+    """Run the image moderation agent on a test input."""
+    assert len(inputs) == 1, "Image moderation expects exactly one input"
+    image_bytes = Path(inputs[0].image_file).read_bytes()
+    # Use the model under test (not the judge model!)
+    model_choice = get_model_under_test()
+    return await moderate_image(model_choice, image_bytes, media_type="image/jpeg")
+
+
+cases: List[Case[List[ImageInput], ImageModerationResult, Any]] = [
+    Case(
+        name="professional_image",
+        inputs=[ImageInput(image_file=get_test_data_path("professional_image.jpg"))],
+        metadata={"category": "image_moderation"},
+        evaluators=(
+            ImageModerationCheck(
+                expected_pii=False,
+                expected_disturbing=False,
+                expected_low_quality=False,
+            ),
+            LLMJudge(
+                model=judge_model,
+                rubric="The rationale should confirm the image is professional with no PII, disturbing content, or quality issues",
+                include_input=True,
+            ),
+        ),
     ),
-    ImageTestCase(
-        filename="landscape.jpg",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Neutral landscape photo"
+    Case(
+        name="image_with_person",
+        inputs=[ImageInput(image_file=get_test_data_path("image_with_person.jpg"))],
+        metadata={"category": "image_moderation"},
+        evaluators=(
+            ImageModerationCheck(
+                expected_pii=True,
+                expected_disturbing=False,
+                expected_low_quality=False,
+            ),
+            LLMJudge(
+                model=judge_model,
+                rubric="The rationale should specifically identify the presence of a person or personally identifiable visual information",
+                include_input=True,
+            ),
+        ),
     ),
-    ImageTestCase(
-        filename="product_photo.jpg",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Product photograph"
-    ),
-    ImageTestCase(
-        filename="id_card.jpg",
-        expected_contains_pii=True,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Image containing ID card (PII)"
-    ),
-    ImageTestCase(
-        filename="faces.jpg",
-        expected_contains_pii=True,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Image with identifiable faces"
+    Case(
+        name="low_quality_image",
+        inputs=[ImageInput(image_file=get_test_data_path("low_quality_image.jpg"))],
+        metadata={"category": "image_moderation"},
+
+        # TODO: define the evaluators for this case. We need:
+        # 1. An ImageModerationCheck that expects expected_pii=True, expected_disturbing=False, expected_low_quality=True
+        # 2. An LLMJudge that uses the judge_model and has a rubric that checks that the rationale describes specific quality
+        #    issues (blurry, pixelated, poor exposure, etc.)
+        evaluators=(
+            ImageModerationCheck(
+                expected_pii=...,  # TODO
+                expected_disturbing=..., # TODO
+                expected_low_quality=..., # TODO
+            ),
+            LLMJudge(
+                model=judge_model,
+                rubric="The rationale should describe specific quality issues (blurry, pixelated, poor exposure, etc.)",
+                include_input=...,  # TODO: in this case it is probably useful to include the input image for contextue
+            ),
+        ),
     ),
 ]
 
 
-def create_test_image(description: str) -> bytes:
-    """Create a minimal test image."""
-    # Minimal JPEG header
-    return bytes([
-        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46,
-        0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
-        0x00, 0x01, 0x00, 0x00, 0xFF, 0xD9
-    ])
+image_dataset = Dataset[List[ImageInput], ImageModerationResult, Any](
+    cases=create_repeated_cases(cases),
+    evaluators=[
+        IsInstance(type_name="ImageModerationResult"),
+        HasRationale(),
+    ],
+)
 
 
-async def evaluate_case(test_case: ImageTestCase) -> dict:
-    """Evaluate a single test case."""
-    # For demo purposes, create dummy image bytes
-    # In production, you would load actual images from evals/test_data/
-    image_bytes = create_test_image(test_case.description)
-    
-    result = await moderate_image(image_bytes)
-    
-    # Check if predictions match expectations
-    pii_correct = result.contains_pii == test_case.expected_contains_pii
-    unfriendly_correct = result.is_unfriendly == test_case.expected_is_unfriendly
-    unprofessional_correct = result.is_unprofessional == test_case.expected_is_unprofessional
-    
-    all_correct = pii_correct and unfriendly_correct and unprofessional_correct
-    
-    return {
-        "description": test_case.description,
-        "filename": test_case.filename,
-        "expected": {
-            "pii": test_case.expected_contains_pii,
-            "unfriendly": test_case.expected_is_unfriendly,
-            "unprofessional": test_case.expected_is_unprofessional
-        },
-        "actual": {
-            "pii": result.contains_pii,
-            "unfriendly": result.is_unfriendly,
-            "unprofessional": result.is_unprofessional
-        },
-        "correct": {
-            "pii": pii_correct,
-            "unfriendly": unfriendly_correct,
-            "unprofessional": unprofessional_correct
-        },
-        "all_correct": all_correct,
-        "rationale": result.rationale
-    }
+async def main():
+    retry_config = RetryConfig(
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_full_jitter(multiplier=0.5, max=15),
+    )
 
+    report = await image_dataset.evaluate(
+        run_image_moderation,
+        retry_task=retry_config,
+        retry_evaluators=retry_config,
+    )
 
-async def run_evals():
-    """Run all evaluation cases."""
-    print("=" * 80)
-    print("IMAGE MODERATION EVALUATION")
-    print("=" * 80)
-    print()
-    
-    results = []
-    for test_case in TEST_CASES:
-        result = await evaluate_case(test_case)
-        results.append(result)
-    
-    # Print results
-    correct_count = 0
-    total_count = len(results)
-    
-    for i, result in enumerate(results, 1):
-        status = "PASS" if result["all_correct"] else "FAIL"
-        print(f"{i}. {status} - {result['description']}")
-        print(f"   File: {result['filename']}")
-        print(f"   Expected: PII={result['expected']['pii']}, "
-              f"Unfriendly={result['expected']['unfriendly']}, "
-              f"Unprofessional={result['expected']['unprofessional']}")
-        print(f"   Actual:   PII={result['actual']['pii']}, "
-              f"Unfriendly={result['actual']['unfriendly']}, "
-              f"Unprofessional={result['actual']['unprofessional']}")
-        
-        if not result["all_correct"]:
-            print(f"   Mismatches: ", end="")
-            mismatches = []
-            if not result["correct"]["pii"]:
-                mismatches.append("PII")
-            if not result["correct"]["unfriendly"]:
-                mismatches.append("Unfriendly")
-            if not result["correct"]["unprofessional"]:
-                mismatches.append("Unprofessional")
-            print(", ".join(mismatches))
-        
-        print()
-        
-        if result["all_correct"]:
-            correct_count += 1
-    
-    # Summary
-    accuracy = (correct_count / total_count) * 100
-    print("=" * 80)
-    print(f"SUMMARY: {correct_count}/{total_count} test cases passed ({accuracy:.1f}% accuracy)")
-    print("=" * 80)
-    print()
-    print("Note: Image moderation may not always achieve 100% accuracy.")
-    print("This is expected behavior as LLM-based moderation has inherent variability.")
+    report.print(include_input=True, include_output=True, include_durations=False)
 
 
 if __name__ == "__main__":
-    asyncio.run(run_evals())
+    import asyncio
+
+    asyncio.run(main())

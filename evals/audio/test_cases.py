@@ -1,127 +1,105 @@
-"""
-Evaluation test cases for audio moderation.
-"""
-import asyncio
-from pydantic import BaseModel
-from typing import List
-from agents.audio_agent import moderate_audio
+import sys
+from pathlib import Path
+from typing import List, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from pydantic import BaseModel, Field
+from pydantic_evals import Case, Dataset
+from pydantic_evals.evaluators import IsInstance, LLMJudge
+import tenacity
+from pydantic_ai.retries import RetryConfig
+
+from multimodal_moderation.agents.audio_agent import moderate_audio
+from multimodal_moderation.types.model_choice import ModelChoice
+from multimodal_moderation.types.moderation_result import AudioModerationResult
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from common_evaluators import HasRationale
+from config import get_model_under_test, get_judge_model
+from utils import create_repeated_cases, get_test_data_path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from evaluators import AudioModerationCheck, HasTranscription
+
+judge_model, judge_settings = get_judge_model()
 
 
-class AudioTestCase(BaseModel):
-    """Test case for audio moderation evaluation."""
-    filename: str
-    expected_contains_pii: bool
-    expected_is_unfriendly: bool
-    expected_is_unprofessional: bool
-    description: str
+class AudioInput(BaseModel):
+    audio_file: str = Field(description="Path to audio file to moderate")
 
 
-# Define test cases
-TEST_CASES: List[AudioTestCase] = [
-    AudioTestCase(
-        filename="professional_greeting.wav",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Professional greeting audio"
+async def run_audio_moderation(inputs: List[AudioInput]) -> AudioModerationResult:
+    assert len(inputs) == 1
+    audio_bytes = Path(inputs[0].audio_file).read_bytes()
+    model_choice = get_model_under_test()
+    return await moderate_audio(model_choice, audio_bytes, media_type="audio/mp3")
+
+
+cases: List[Case[List[AudioInput], AudioModerationResult, Any]] = [
+    Case(
+        name="professional_audio",
+        inputs=[AudioInput(audio_file=get_test_data_path("professional_audio.mp3"))],
+        metadata={"category": "audio_moderation"},
+        evaluators=(
+            AudioModerationCheck(
+                expected_pii=False,
+                expected_unfriendly=False,
+                expected_unprofessional=False,
+            ),
+            LLMJudge(
+                model=judge_model,
+                rubric="The rationale should explain why the transcribed content is professional and friendly",
+                include_input=True,
+            ),
+        ),
     ),
-    AudioTestCase(
-        filename="customer_inquiry.wav",
-        expected_contains_pii=False,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Customer inquiry"
-    ),
-    AudioTestCase(
-        filename="contact_info.wav",
-        expected_contains_pii=True,
-        expected_is_unfriendly=False,
-        expected_is_unprofessional=False,
-        description="Audio with contact information"
+    Case(
+        name="audio_with_pii",
+        inputs=[AudioInput(audio_file=get_test_data_path("audio_with_pii.mp3"))],
+        metadata={"category": "audio_moderation"},
+        evaluators=(
+            AudioModerationCheck(
+                expected_pii=True,
+                expected_unfriendly=False,
+                expected_unprofessional=False,
+            ),
+            LLMJudge(
+                model=judge_model,
+                rubric="The rationale should identify specific PII mentioned in the transcription (names, addresses, phone numbers)",
+                include_input=True,
+            ),
+        ),
     ),
 ]
 
 
-def create_test_audio() -> bytes:
-    """Create a minimal test audio file."""
-    # Minimal WAV header
-    return bytes([
-        0x52, 0x49, 0x46, 0x46,  # "RIFF"
-        0x24, 0x00, 0x00, 0x00,  # Chunk size
-        0x57, 0x41, 0x56, 0x45,  # "WAVE"
-        0x66, 0x6D, 0x74, 0x20   # "fmt "
-    ] * 8)
+audio_dataset = Dataset[List[AudioInput], AudioModerationResult, Any](
+    cases=create_repeated_cases(cases),
+    evaluators=[
+        IsInstance(type_name="AudioModerationResult"),
+        HasRationale(),
+        HasTranscription(),
+    ],
+)
 
 
-async def evaluate_case(test_case: AudioTestCase) -> dict:
-    """Evaluate a single test case."""
-    audio_bytes = create_test_audio()
-    result = await moderate_audio(audio_bytes)
-    
-    pii_correct = result.contains_pii == test_case.expected_contains_pii
-    unfriendly_correct = result.is_unfriendly == test_case.expected_is_unfriendly
-    unprofessional_correct = result.is_unprofessional == test_case.expected_is_unprofessional
-    
-    all_correct = pii_correct and unfriendly_correct and unprofessional_correct
-    
-    return {
-        "description": test_case.description,
-        "filename": test_case.filename,
-        "expected": {
-            "pii": test_case.expected_contains_pii,
-            "unfriendly": test_case.expected_is_unfriendly,
-            "unprofessional": test_case.expected_is_unprofessional
-        },
-        "actual": {
-            "pii": result.contains_pii,
-            "unfriendly": result.is_unfriendly,
-            "unprofessional": result.is_unprofessional
-        },
-        "correct": {
-            "pii": pii_correct,
-            "unfriendly": unfriendly_correct,
-            "unprofessional": unprofessional_correct
-        },
-        "all_correct": all_correct,
-        "rationale": result.rationale
-    }
+async def main():
+    retry_config = RetryConfig(
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_full_jitter(multiplier=0.5, max=15),
+    )
 
+    report = await audio_dataset.evaluate(
+        run_audio_moderation,
+        retry_task=retry_config,
+        retry_evaluators=retry_config,
+    )
 
-async def run_evals():
-    """Run all evaluation cases."""
-    print("=" * 80)
-    print("AUDIO MODERATION EVALUATION")
-    print("=" * 80)
-    print()
-    
-    results = []
-    for test_case in TEST_CASES:
-        result = await evaluate_case(test_case)
-        results.append(result)
-    
-    correct_count = 0
-    total_count = len(results)
-    
-    for i, result in enumerate(results, 1):
-        status = "PASS" if result["all_correct"] else "FAIL"
-        print(f"{i}. {status} - {result['description']}")
-        print(f"   File: {result['filename']}")
-        print(f"   Expected: PII={result['expected']['pii']}, "
-              f"Unfriendly={result['expected']['unfriendly']}, "
-              f"Unprofessional={result['expected']['unprofessional']}")
-        print(f"   Actual:   PII={result['actual']['pii']}, "
-              f"Unfriendly={result['actual']['unfriendly']}, "
-              f"Unprofessional={result['actual']['unprofessional']}")
-        print()
-        
-        if result["all_correct"]:
-            correct_count += 1
-    
-    accuracy = (correct_count / total_count) * 100
-    print("=" * 80)
-    print(f"SUMMARY: {correct_count}/{total_count} test cases passed ({accuracy:.1f}% accuracy)")
-    print("=" * 80)
+    report.print(include_input=True, include_output=True, include_durations=False)
 
 
 if __name__ == "__main__":
-    asyncio.run(run_evals())
+    import asyncio
+
+    asyncio.run(main())
