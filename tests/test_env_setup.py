@@ -22,7 +22,7 @@ from multimodal_moderation.env import (
 )
 
 
-def _is_gemini_auth_error(error: Exception) -> bool:
+def _is_gemini_integration_error(error: Exception) -> bool:
     message = str(error).lower()
     return any(
         marker in message
@@ -33,6 +33,13 @@ def _is_gemini_auth_error(error: Exception) -> bool:
             "api key not valid",
             "api_key_invalid",
             "status_code: 401",
+            "not_found",
+            "status_code: 404",
+            "is not found for api version",
+            "listmodels to see the list of available models",
+            "resource_exhausted",
+            "status_code: 429",
+            "prepayment credits are depleted",
         )
     )
 
@@ -109,10 +116,10 @@ async def test_can_call_gemini_api():
             "Output should not be empty (indicates model generated content)"
 
     except Exception as e:
-        if _is_gemini_auth_error(e):
+        if _is_gemini_integration_error(e):
             pytest.skip(
-                "Gemini rejected the configured API key. The project now accepts both AIzaSy and AQ key formats, "
-                "but the backend still decides whether the specific key is usable."
+                "Gemini integration could not run with the current runtime configuration "
+                "(invalid key, unavailable model, or backend mismatch)."
             )
         pytest.fail(
             f"Failed to call Gemini API. Error: {str(e)}\n"

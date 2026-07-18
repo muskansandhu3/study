@@ -1,0 +1,177 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /Users/muskansandhu/Downloads/Gen/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/muskansandhu/Downloads/Gen/OmniTrainer
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2, logfire-4.37.0, arize-phoenix-client-2.13.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 50 items
+
+tests/test_audio_agent.py::test_moderate_audio_exists PASSED             [  2%]
+tests/test_audio_agent.py::test_moderate_audio_returns_audio_moderation_result PASSED [  4%]
+tests/test_audio_agent.py::test_moderate_audio_has_required_fields PASSED [  6%]
+tests/test_audio_agent.py::test_moderate_audio_rationale_not_empty PASSED [  8%]
+tests/test_audio_agent.py::test_moderate_audio_transcription_not_empty PASSED [ 10%]
+tests/test_env_setup.py::test_env_file_exists PASSED                     [ 12%]
+tests/test_env_setup.py::test_gemini_api_key_is_set PASSED               [ 14%]
+tests/test_env_setup.py::test_user_api_key_is_set PASSED                 [ 16%]
+tests/test_env_setup.py::test_default_google_model_is_set PASSED         [ 18%]
+tests/test_env_setup.py::test_can_call_gemini_api SKIPPED (Gemini
+integration could not run with the current runtime configuration
+(invalid key, unavailable model, or backend mismatch).)                  [ 20%]
+tests/test_gradio_app.py::test_create_chat_interface_returns_blocks PASSED [ 22%]
+tests/test_gradio_app.py::test_chatbot_uses_messages_type PASSED         [ 24%]
+tests/test_gradio_app.py::test_chatbot_has_copy_button PASSED            [ 26%]
+tests/test_gradio_app.py::test_demo_has_chatbot_component PASSED         [ 28%]
+tests/test_gradio_app.py::test_demo_has_multimodal_textbox PASSED        [ 30%]
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_multiple_files PASSED [ 32%]
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_correct_file_types PASSED [ 34%]
+tests/test_gradio_app.py::test_chat_with_gemini_calls_moderation PASSED  [ 36%]
+tests/test_gradio_app.py::test_chat_with_gemini_blocks_flagged_content PASSED [ 38%]
+tests/test_image_agent.py::test_moderate_image_exists PASSED             [ 40%]
+tests/test_image_agent.py::test_moderate_image_returns_image_moderation_result PASSED [ 42%]
+tests/test_image_agent.py::test_moderate_image_has_required_fields PASSED [ 44%]
+tests/test_image_agent.py::test_moderate_image_rationale_not_empty PASSED [ 46%]
+tests/test_moderation_result.py::TestModerationResult::test_has_rationale_field PASSED [ 48%]
+tests/test_moderation_result.py::TestModerationResult::test_rationale_is_required PASSED [ 50%]
+tests/test_moderation_result.py::TestModerationResult::test_is_pydantic_model PASSED [ 52%]
+tests/test_moderation_result.py::TestTextModerationResult::test_has_all_required_fields PASSED [ 54%]
+tests/test_moderation_result.py::TestTextModerationResult::test_field_types PASSED [ 56%]
+tests/test_moderation_result.py::TestTextModerationResult::test_inherits_from_moderation_result PASSED [ 58%]
+tests/test_moderation_result.py::TestTextModerationResult::test_all_fields_are_required PASSED [ 60%]
+tests/test_moderation_result.py::TestImageModerationResult::test_has_all_required_fields PASSED [ 62%]
+tests/test_moderation_result.py::TestImageModerationResult::test_field_types PASSED [ 64%]
+tests/test_moderation_result.py::TestImageModerationResult::test_inherits_from_moderation_result PASSED [ 66%]
+tests/test_moderation_result.py::TestImageModerationResult::test_all_fields_are_required PASSED [ 68%]
+tests/test_moderation_result.py::TestVideoModerationResult::test_has_all_required_fields PASSED [ 70%]
+tests/test_moderation_result.py::TestVideoModerationResult::test_field_types PASSED [ 72%]
+tests/test_moderation_result.py::TestVideoModerationResult::test_inherits_from_moderation_result PASSED [ 74%]
+tests/test_moderation_result.py::TestVideoModerationResult::test_all_fields_are_required PASSED [ 76%]
+tests/test_moderation_result.py::TestAudioModerationResult::test_has_all_required_fields PASSED [ 78%]
+tests/test_moderation_result.py::TestAudioModerationResult::test_field_types PASSED [ 80%]
+tests/test_moderation_result.py::TestAudioModerationResult::test_inherits_from_moderation_result PASSED [ 82%]
+tests/test_moderation_result.py::TestAudioModerationResult::test_all_fields_are_required PASSED [ 84%]
+tests/test_text_agent.py::test_moderate_text_exists PASSED               [ 86%]
+tests/test_text_agent.py::test_moderate_text_returns_text_moderation_result PASSED [ 88%]
+tests/test_text_agent.py::test_moderate_text_has_required_fields PASSED  [ 90%]
+tests/test_text_agent.py::test_moderate_text_rationale_not_empty PASSED  [ 92%]
+tests/test_video_agent.py::test_moderate_video_exists PASSED             [ 94%]
+tests/test_video_agent.py::test_moderate_video_returns_video_moderation_result PASSED [ 96%]
+tests/test_video_agent.py::test_moderate_video_has_required_fields PASSED [ 98%]
+tests/test_video_agent.py::test_moderate_video_rationale_not_empty PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/test_gradio_app.py::test_create_chat_interface_returns_blocks
+tests/test_gradio_app.py::test_chatbot_uses_messages_type
+tests/test_gradio_app.py::test_chatbot_has_copy_button
+tests/test_gradio_app.py::test_demo_has_chatbot_component
+tests/test_gradio_app.py::test_demo_has_multimodal_textbox
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_multiple_files
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_correct_file_types
+  /Users/muskansandhu/Downloads/Gen/OmniTrainer/multimodal_moderation/gradio_app.py:401: DeprecationWarning: The 'show_copy_button' parameter will be removed in Gradio 6.0. You will need to use 'buttons=["copy"]' instead.
+    chatbot=gr.Chatbot(
+
+tests/test_gradio_app.py::test_create_chat_interface_returns_blocks
+tests/test_gradio_app.py::test_chatbot_uses_messages_type
+tests/test_gradio_app.py::test_chatbot_has_copy_button
+tests/test_gradio_app.py::test_demo_has_chatbot_component
+tests/test_gradio_app.py::test_demo_has_multimodal_textbox
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_multiple_files
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_correct_file_types
+  /Users/muskansandhu/Downloads/Gen/OmniTrainer/multimodal_moderation/gradio_app.py:401: DeprecationWarning: The default value of 'allow_tags' in gr.Chatbot will be changed from False to True in Gradio 6.0. You will need to explicitly set allow_tags=False if you want to disable tags in your chatbot.
+    chatbot=gr.Chatbot(
+
+tests/test_gradio_app.py::test_create_chat_interface_returns_blocks
+tests/test_gradio_app.py::test_chatbot_uses_messages_type
+tests/test_gradio_app.py::test_chatbot_has_copy_button
+tests/test_gradio_app.py::test_demo_has_chatbot_component
+tests/test_gradio_app.py::test_demo_has_multimodal_textbox
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_multiple_files
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_correct_file_types
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:598: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    user_submit = self.textbox.submit(
+
+tests/test_gradio_app.py: 168 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:287: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    self._setup_events()
+
+tests/test_gradio_app.py: 14 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:607: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    submit_event = user_submit.then(  # The reason we do this outside of the submit_fn is that we want to update the chatbot UI with the user message immediately, before the submit_fn is called
+
+tests/test_gradio_app.py: 21 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:616: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    submit_event.then(**synchronize_chat_state_kwargs).then(
+
+tests/test_gradio_app.py: 14 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:662: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    self.chatbot.retry(
+
+tests/test_gradio_app.py::test_create_chat_interface_returns_blocks
+tests/test_gradio_app.py::test_chatbot_uses_messages_type
+tests/test_gradio_app.py::test_chatbot_has_copy_button
+tests/test_gradio_app.py::test_demo_has_chatbot_component
+tests/test_gradio_app.py::test_demo_has_multimodal_textbox
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_multiple_files
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_correct_file_types
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:669: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    .then(
+
+tests/test_gradio_app.py::test_create_chat_interface_returns_blocks
+tests/test_gradio_app.py::test_chatbot_uses_messages_type
+tests/test_gradio_app.py::test_chatbot_has_copy_button
+tests/test_gradio_app.py::test_demo_has_chatbot_component
+tests/test_gradio_app.py::test_demo_has_multimodal_textbox
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_multiple_files
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_correct_file_types
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:676: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    .then(
+
+tests/test_gradio_app.py: 21 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:683: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    retry_event.then(**synchronize_chat_state_kwargs).then(
+
+tests/test_gradio_app.py::test_create_chat_interface_returns_blocks
+tests/test_gradio_app.py::test_chatbot_uses_messages_type
+tests/test_gradio_app.py::test_chatbot_has_copy_button
+tests/test_gradio_app.py::test_demo_has_chatbot_component
+tests/test_gradio_app.py::test_demo_has_multimodal_textbox
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_multiple_files
+tests/test_gradio_app.py::test_multimodal_textbox_accepts_correct_file_types
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:798: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    after_success.success(
+
+tests/test_gradio_app.py: 42 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:693: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    self._setup_stop_events(
+
+tests/test_gradio_app.py: 14 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:811: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    event_trigger(
+
+tests/test_gradio_app.py: 14 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:824: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    event_to_cancel.then(
+
+tests/test_gradio_app.py: 14 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:835: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    self.textbox.stop(
+
+tests/test_gradio_app.py: 21 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:702: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    self.chatbot.undo(
+
+tests/test_gradio_app.py: 28 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:710: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    self.chatbot.option_select(
+
+tests/test_gradio_app.py: 14 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:719: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    self.chatbot.clear(**synchronize_chat_state_kwargs).then(
+
+tests/test_gradio_app.py: 14 warnings
+  /Users/muskansandhu/Downloads/Gen/.venv/lib/python3.11/site-packages/gradio/chat_interface.py:783: DeprecationWarning: The 'show_api' parameter in event listeners will be removed in Gradio 6.0. You will need to use the 'api_visibility' parameter instead. To replicate show_api=False, in Gradio 6.0, use api_visibility='undocumented'.
+    self.chatbot_value.change(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 49 passed, 1 skipped, 441 warnings in 24.10s =================

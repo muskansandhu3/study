@@ -1,0 +1,30 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /Users/muskansandhu/Downloads/Gen/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/muskansandhu/Downloads/Gen/OmniTrainer
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2, logfire-4.37.0, arize-phoenix-client-2.13.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 19 items
+
+tests/test_moderation_result.py::TestModerationResult::test_has_rationale_field PASSED [  5%]
+tests/test_moderation_result.py::TestModerationResult::test_rationale_is_required PASSED [ 10%]
+tests/test_moderation_result.py::TestModerationResult::test_is_pydantic_model PASSED [ 15%]
+tests/test_moderation_result.py::TestTextModerationResult::test_has_all_required_fields PASSED [ 21%]
+tests/test_moderation_result.py::TestTextModerationResult::test_field_types PASSED [ 26%]
+tests/test_moderation_result.py::TestTextModerationResult::test_inherits_from_moderation_result PASSED [ 31%]
+tests/test_moderation_result.py::TestTextModerationResult::test_all_fields_are_required PASSED [ 36%]
+tests/test_moderation_result.py::TestImageModerationResult::test_has_all_required_fields PASSED [ 42%]
+tests/test_moderation_result.py::TestImageModerationResult::test_field_types PASSED [ 47%]
+tests/test_moderation_result.py::TestImageModerationResult::test_inherits_from_moderation_result PASSED [ 52%]
+tests/test_moderation_result.py::TestImageModerationResult::test_all_fields_are_required PASSED [ 57%]
+tests/test_moderation_result.py::TestVideoModerationResult::test_has_all_required_fields PASSED [ 63%]
+tests/test_moderation_result.py::TestVideoModerationResult::test_field_types PASSED [ 68%]
+tests/test_moderation_result.py::TestVideoModerationResult::test_inherits_from_moderation_result PASSED [ 73%]
+tests/test_moderation_result.py::TestVideoModerationResult::test_all_fields_are_required PASSED [ 78%]
+tests/test_moderation_result.py::TestAudioModerationResult::test_has_all_required_fields PASSED [ 84%]
+tests/test_moderation_result.py::TestAudioModerationResult::test_field_types PASSED [ 89%]
+tests/test_moderation_result.py::TestAudioModerationResult::test_inherits_from_moderation_result PASSED [ 94%]
+tests/test_moderation_result.py::TestAudioModerationResult::test_all_fields_are_required PASSED [100%]
+
+============================== 19 passed in 0.02s ==============================
